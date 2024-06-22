@@ -1,39 +1,46 @@
 #!/usr/bin/python3
-"""
-Log parsing
-"""
+''' This defines a program to parse logs in real time '''
 
 import sys
+import re
 
-if __name__ == '__main__':
+fp = (
+        r'\s*(?P<ip>\S+)\s*',
+        r'\s*\[(?P<date>\d+\-\d+\-\d+ \d+:\d+:\d+\.\d+)\]',
+        r'\s*"(?P<request>[^"]*)"\s*',
+        r'\s*(?P<status_code>\S+)',
+        r'\s*(?P<file_size>\d+)'
+    )
+fmt = '{}\\-{}{}{}{}\\s*'.format(fp[0], fp[1], fp[2], fp[3], fp[4])
 
-    filesize, count = 0, 0
-    codes = ["200", "301", "400", "401", "403", "404", "405", "500"]
-    stats = {k: 0 for k in codes}
+status_codes = {200: 0, 301: 0, 400: 0, 401: 0, 403: 0, 404: 0, 405: 0, 500: 0}
+total_lines = 0
+file_size = 0
 
-    def print_stats(stats: dict, file_size: int) -> None:
-        print("File size: {:d}".format(filesize))
-        for k, v in sorted(stats.items()):
-            if v:
-                print("{}: {}".format(k, v))
+try:
+    while True:
+        total_lines += 1
 
-    try:
-        for line in sys.stdin:
-            count += 1
-            data = line.split()
+        match = re.fullmatch(fmt, input().strip())
+        if match:
             try:
-                status_code = data[-2]
-                if status_code in stats:
-                    stats[status_code] += 1
-            except BaseException:
-                pass
-            try:
-                filesize += int(data[-1])
-            except BaseException:
-                pass
-            if count % 10 == 0:
-                print_stats(stats, filesize)
-        print_stats(stats, filesize)
-    except KeyboardInterrupt:
-        print_stats(stats, filesize)
-        raise
+                file_size += int(match.group('file_size'))
+                stat_code = int(match.group('status_code'))
+
+                if stat_code and stat_code in status_codes:
+                    status_codes[stat_code] += 1
+
+                if total_lines % 10 == 0:
+                    print(f"File size: {file_size}")
+                    for key, val in sorted(status_codes.items()):
+                        if val != 0:
+                            print("{}: {}".format(key, val))
+
+            except ValueError:
+                continue
+
+except (KeyboardInterrupt, EOFError):
+    print(f"File size: {file_size}")
+    for key, val in sorted(status_codes.items()):
+        if val != 0:
+            print("{}: {}".format(key, val))
