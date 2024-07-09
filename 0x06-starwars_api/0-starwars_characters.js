@@ -1,42 +1,53 @@
 #!/usr/bin/node
+
 const request = require('request');
 
-if (process.argv.length < 3) {
-  console.log('Usage: ./0-starwars_characters.js <Movie ID>');
-  process.exit(1);
-}
-
 const movieId = process.argv[2];
-const url = `https://swapi-api.hbtn.io/api/films/${movieId}/`;
+const filmEndPoint = 'https://swapi-api.hbtn.io/api/films/' + movieId;
+let people = [];
+const names = [];
 
-request(url, (error, response, body) => {
-  if (error) {
-    console.error('Error:', error);
-    return;
+const requestCharacters = async () => {
+  await new Promise(resolve => request(filmEndPoint, (err, res, body) => {
+    if (err || res.statusCode !== 200) {
+      console.error('Error: ', err, '| StatusCode: ', res.statusCode);
+    } else {
+      const jsonBody = JSON.parse(body);
+      people = jsonBody.characters;
+      resolve();
+    }
+  }));
+};
+
+const requestNames = async () => {
+  if (people.length > 0) {
+    for (const p of people) {
+      await new Promise(resolve => request(p, (err, res, body) => {
+        if (err || res.statusCode !== 200) {
+          console.error('Error: ', err, '| StatusCode: ', res.statusCode);
+        } else {
+          const jsonBody = JSON.parse(body);
+          names.push(jsonBody.name);
+          resolve();
+        }
+      }));
+    }
+  } else {
+    console.error('Error: Got no Characters for some reason');
   }
+};
 
-  if (response.statusCode !== 200) {
-    console.error(`Error: Status code ${response.statusCode}`);
-    return;
+const getCharNames = async () => {
+  await requestCharacters();
+  await requestNames();
+
+  for (const n of names) {
+    if (n === names[names.length - 1]) {
+      process.stdout.write(n);
+    } else {
+      process.stdout.write(n + '\n');
+    }
   }
+};
 
-  const filmData = JSON.parse(body);
-  const characters = filmData.characters;
-
-  characters.forEach(characterUrl => {
-    request(characterUrl, (charError, charResponse, charBody) => {
-      if (charError) {
-        console.error('Error:', charError);
-        return;
-      }
-
-      if (charResponse.statusCode !== 200) {
-        console.error(`Error: Status code ${charResponse.statusCode}`);
-        return;
-      }
-
-      const characterData = JSON.parse(charBody);
-      console.log(characterData.name);
-    });
-  });
-});
+getCharNames();
